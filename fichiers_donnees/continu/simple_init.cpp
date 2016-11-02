@@ -59,8 +59,7 @@ double sol1_5percent(int segment, void *data) {
     
     switch(segment) { 
         case 1:  
-            std::cout << ttCurrentTime() << " : Alarm: sol 1 is at 5 percent" << std::endl;
-            
+            std::cout << ttCurrentTime() << " : Alarm: sol 1 is at 5 percent" << std::endl;            
             return ttCurrentTime(); 
      default: 
          return FINISHED; 

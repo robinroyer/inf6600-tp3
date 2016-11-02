@@ -33,6 +33,7 @@ class CtrlData {
         bool isSol2Empty;
         int actualSolution;
         double lastAntibioticInjection;
+        double lastAnticoagulantInjection;
         double antibioticPeriod;
         double counter;
         double exectime;
@@ -60,8 +61,7 @@ double sol1_5percent(int segment, void *data) {
     switch(segment) { 
         case 1:  
             std::cout << ttCurrentTime() << " : Alarm: sol 1 is at 5 percent" << std::endl;
-            
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -84,7 +84,7 @@ double sol1_1percent(int segment, void *data) {
                 std::cout <<ttCurrentTime() << " : PANIC: no more insuline" << std::endl;
             }
             
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -97,7 +97,7 @@ double sol2_5percent(int segment, void *data) {
     switch(segment) { 
         case 1:  
             std::cout <<ttCurrentTime() << " : Alarm: sol 2 is at 5 percent" << std::endl;
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -120,7 +120,7 @@ double sol2_1percent(int segment, void *data) {
             else{
                 std::cout <<ttCurrentTime() << " : PANIC: no more insuline" << std::endl;
             }
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -133,7 +133,7 @@ double stop_antibiotic(int segment, void *data) {
     switch(segment) { 
         case 1:            
             ttAnalogOut(d->out->antibiotic,0);// stop antibiotic injection
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -151,7 +151,7 @@ double inject_glucose(int segment, void *data) {
             ttAnalogOut(d->out->anticoagulant,0);
             ttAnalogOut(d->out->antibiotic,0);
             ttAnalogOut(d->out->glucose_injection,1);
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -177,7 +177,7 @@ double average_glycemia(int segment, void *data) {
                     break;                               
             }
             
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -190,7 +190,7 @@ double launchInjection(int segment, void *data) {
     switch(segment) { 
         case 1:  
             ttAnalogOut(d->out->sol1,1);            
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -202,15 +202,15 @@ double injectAnticoagulant(int segment, void *data) {
         
     switch(segment) { 
         case 1:
-            d->counter += d->antibioticPeriod;
-            if(d->counter >= d->ONE_DAY_IN_SECONDS){
+            d->counter += d->
+            if(ttCurrentTime() - d->lastAntibioticInjection >= d->ONE_DAY_IN_SECONDS){
                 std::cout << ttCurrentTime() <<" : inject Anticoagulant !" << std::endl;
-                d->counter = 0;
+                d->lastAnticoagulantInjection = ttCurrentTime();
                 ttAnalogOut(d->out->anticoagulant,1);
             }
             ttCreateTimer("stop_anticoagulant_timer",  ttCurrentTime() + 120, "stop_anticoagulant");
             
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -225,8 +225,9 @@ double stopAnticoagulant(int segment, void *data) {
             ttAnalogOut(d->out->anticoagulant,0);                        
             std::cout <<ttCurrentTime() << " : inject antibiotic" << std::endl;
             ttAnalogOut(d->out->antibiotic,1);
+            d->lastAntibioticInjection = d->exectime;
             
-            return ttCurrentTime(); 
+            return d->exectime; 
      default: 
          return FINISHED; 
      } 
@@ -246,8 +247,10 @@ void init() {
     // first solution is the 1
     data->actualSolution = 1;
     // add value to force first injection
-    data->counter = data->ONE_DAY_IN_SECONDS;
+    data->lastAntibioticInjection = -1 * data->ONE_DAY_IN_SECONDS;
+    data->lastAnticoagulantInjection = -1 * data->ONE_DAY_IN_SECONDS;
     data->antibioticPeriod = data->DEFAULT_PERIOD; // default period and then ask user
+    //TODO: ask the user
     
     // first time
     data->exectime = 0,1;

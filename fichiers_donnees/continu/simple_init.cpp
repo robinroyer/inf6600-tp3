@@ -43,19 +43,21 @@ class CtrlData {
         const double TWO_MINUTES_IN_SECONDS = 120;
         const double HEIGHT_HOURS_IN_SECONDS = 28800;
         // Const used in simulation
+        const double CRITICAL_PRIORITY = 2;
+        const double HIGH_PRIORITY = 10;
         const double DEFAULT_PRIORITY = 15;
+        const double LOW_PRIORITY = 20;
         const double DEFAULT_PERIOD = HEIGHT_HOURS_IN_SECONDS;   
-        const double FIRST_INJECTION_CALL = 120; // => 2minutes
+        const double FIRST_INJECTION_CALL = 1; 
 };
 
 // handler
 double sol1_5percent(int segment, void *data) { 
     CtrlData *d = (CtrlData *)data; 
- 
+    
     switch(segment) { 
         case 1:  
-            // alert
-            mexPrintf("alert");
+            std::cout << ttCurrentTime() << " : Alarm: sol 1 is at 5 percent" << std::endl;
             return d->exectime; 
      default: 
          return FINISHED; 
@@ -67,6 +69,7 @@ double sol1_1percent(int segment, void *data) {
  
     switch(segment) { 
         case 1:
+            std::cout <<ttCurrentTime() << " : Alarm: sol 1 is at 1 percent" << std::endl;
             ttAnalogOut(d->out->sol1,0);                 
             d->isSol1Empty = true;
                 
@@ -75,8 +78,7 @@ double sol1_1percent(int segment, void *data) {
                 d->actualSolution = 2;
             }
             else{
-                // PANIC
-                //alarm('no more insuline');
+                std::cout <<ttCurrentTime() << " : PANIC: no more insuline" << std::endl;
             }
             
             return d->exectime; 
@@ -91,7 +93,7 @@ double sol2_5percent(int segment, void *data) {
  
     switch(segment) { 
         case 1:  
-            // alert
+            std::cout <<ttCurrentTime() << " : Alarm: sol 2 is at 5 percent" << std::endl;
             return d->exectime; 
      default: 
          return FINISHED; 
@@ -104,6 +106,7 @@ double sol2_1percent(int segment, void *data) {
  
     switch(segment) { 
         case 1:
+            std::cout <<ttCurrentTime() << " : Alarm: sol 2 is at 1 percent" << std::endl;
             ttAnalogOut(d->out->sol2,0);            
             d->isSol2Empty = true;
                     
@@ -112,8 +115,7 @@ double sol2_1percent(int segment, void *data) {
                 d->actualSolution = 1;
             }
             else{
-                // PANIC => bad bad bad
-                //alarm('no more insuline');
+                std::cout <<ttCurrentTime() << " : PANIC: no more insuline" << std::endl;
             }
             return d->exectime; 
      default: 
@@ -124,7 +126,7 @@ double sol2_1percent(int segment, void *data) {
 // handler
 double stop_antibiotic(int segment, void *data) { 
     CtrlData *d = (CtrlData *)data; 
- 
+    std::cout << ttCurrentTime() << " : Stop antibiotic" << std::endl;
     switch(segment) { 
         case 1:            
             ttAnalogOut(d->out->antibiotic,0);// stop antibiotic injection
@@ -135,9 +137,9 @@ double stop_antibiotic(int segment, void *data) {
  } 
 
 // handler
-double critical_glycemia(int segment, void *data) { 
+double inject_glucose(int segment, void *data) { 
     CtrlData *d = (CtrlData *)data; 
- 
+    std::cout <<ttCurrentTime() << " : critical_glycemia" << std::endl;
     switch(segment) { 
         case 1:  
             // stop everything and make an urgency injection
@@ -155,7 +157,7 @@ double critical_glycemia(int segment, void *data) {
 // handler
 double average_glycemia(int segment, void *data) { 
     CtrlData *d = (CtrlData *)data; 
- 
+    std::cout << ttCurrentTime() <<" : Average glycemia" << std::endl;
     switch(segment) { 
         case 1:  
             // stop all injection
@@ -181,10 +183,9 @@ double average_glycemia(int segment, void *data) {
 // handler
 double launchInjection(int segment, void *data) { 
     CtrlData *d = (CtrlData *)data; 
- 
+    std::cout <<ttCurrentTime() << " : First injection !" << std::endl;
     switch(segment) { 
         case 1:  
-            // launch first injection injection
             ttAnalogOut(d->out->sol1,1);            
             return d->exectime; 
      default: 
@@ -194,19 +195,35 @@ double launchInjection(int segment, void *data) {
 
 // periodic method
 double injectAnticoagulant(int segment, void *data) { 
-    CtrlData *d = (CtrlData *)data; 
- 
+    CtrlData *d = (CtrlData *)data;
+    
     switch(segment) { 
         case 1:  
-            if(d->exectime - d->lastAntibioticInjection > d->ONE_DAY_IN_SECONDS){
+            if(true /*d->exectime - d->lastAntibioticInjection > d->ONE_DAY_IN_SECONDS*/){
+                std::cout << ttCurrentTime() <<" : inject Anticoagulant" << std::endl;
                 ttAnalogOut(d->out->anticoagulant,1);
-                ttSleepUntil(d->TWO_MINUTES_IN_SECONDS);//wait 2 min
-                ttAnalogOut(d->out->anticoagulant,0);
-                d->lastAntibioticInjection = d->exectime;
+                ttCreateTimer("stop_anticoagulant_timer",  ttCurrentTime() + 120, "stop_anticoagulant");
             }
+            return d->exectime; 
+     default: 
+         return FINISHED; 
+     } 
+ }
+
+// periodic method
+double stopAnticoagulant(int segment, void *data) { 
+    CtrlData *d = (CtrlData *)data;
+    
+    switch(segment) { 
+        case 1:  
+            std::cout <<ttCurrentTime() << " : stop anticoagulant" << std::endl;
+            ttAnalogOut(d->out->anticoagulant,0);
+            d->lastAnticoagulantInjection= d->exectime;
             
+            std::cout <<ttCurrentTime() << " : inject antibiotic" << std::endl;
             ttAnalogOut(d->out->antibiotic,1);
-            d->lastAnticoagulantInjection = d->exectime;
+            d->lastAntibioticInjection = d->exectime;
+            
             return d->exectime; 
      default: 
          return FINISHED; 
@@ -238,24 +255,23 @@ void init() {
     data->exectime = 0,1;
     
     ttInitKernel(prioFP); 
-    //mexPrintf("init the kernel");
     
     // =========================== Tasks
     
     // SOLUTION 1, 5 PERCENTAGE
-    ttCreateHandler("sol1_5percent", data->DEFAULT_PRIORITY, sol1_5percent, data); 
+    ttCreateHandler("sol1_5percent", data->LOW_PRIORITY, sol1_5percent, data); 
     ttAttachTriggerHandler(data->in->sol1_5percent, "sol1_5percent"); 
     
     // SOLUTION 1, 1 PERCENTAGE
-    ttCreateHandler("sol1_1percent", data->DEFAULT_PRIORITY, sol1_1percent, data); 
+    ttCreateHandler("sol1_1percent", data->HIGH_PRIORITY, sol1_1percent, data); 
     ttAttachTriggerHandler(data->in->sol1_1percent, "sol1_1percent");
     
     // SOLUTION 2, 5 PERCENTAGE
-    ttCreateHandler("sol2_5percent", data->DEFAULT_PRIORITY, sol2_5percent, data); 
+    ttCreateHandler("sol2_5percent", data->LOW_PRIORITY, sol2_5percent, data); 
     ttAttachTriggerHandler(data->in->sol2_5percent, "sol2_5percent");
     
     // SOLUTION 2, 1 PERCENTAGE
-    ttCreateHandler("sol2_1percent", data->DEFAULT_PRIORITY, sol2_1percent, data); 
+    ttCreateHandler("sol2_1percent", data->HIGH_PRIORITY, sol2_1percent, data); 
     ttAttachTriggerHandler(data->in->sol2_1percent, "sol2_1percent");
         
     // STOP ANTIBITOTIC
@@ -263,11 +279,11 @@ void init() {
     ttAttachTriggerHandler(data->in->stop_antibiotic, "stop_antibiotic");
            
     // CRITICAL GLYCEMIA
-    ttCreateHandler("critical_glycemia", data->DEFAULT_PRIORITY, critical_glycemia, data); 
+    ttCreateHandler("critical_glycemia", data->CRITICAL_PRIORITY, inject_glucose, data); 
     ttAttachTriggerHandler(data->in->critical_glycemia, "critical_glycemia");
         
     // AVERAGE GLYCEMIA
-    ttCreateHandler("average_glycemia", data->DEFAULT_PRIORITY, average_glycemia, data); 
+    ttCreateHandler("average_glycemia", data->HIGH_PRIORITY, average_glycemia, data); 
     ttAttachTriggerHandler(data->in->average_glycemia, "average_glycemia");
     
    // TODO: handle user input
@@ -277,9 +293,13 @@ void init() {
    // =>
     
     // ANTIBIOTIC INJECTION
-    //ttCreatePeriodicTask("antibiotic_injection", data->FIRST_INJECTION_CALL, data->antibioticPeriod, injectAnticoagulant, data);
+    ttCreatePeriodicTask("antibiotic_injection", data->FIRST_INJECTION_CALL, data->antibioticPeriod, injectAnticoagulant, data);
+    ttSetPriority(data->DEFAULT_PRIORITY, "antibiotic_injection");
     
-   // init first injection
+    //STOP ANTICOAGULANT
+    ttCreateHandler("stop_anticoagulant", data->DEFAULT_PRIORITY, stopAnticoagulant, data);
+   
+// init first injection
     ttCreateTask("first_injection", data->DEFAULT_PRIORITY, launchInjection, data); 
     ttCreateJob("first_injection");
 }
